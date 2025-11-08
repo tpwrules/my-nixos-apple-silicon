@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
 
     steps:
       - uses: actions/checkout@v5
@@ -20,6 +20,39 @@ jobs:
           extra_nix_config: |
             # save space on disk and in cache
             auto-optimise-store = true
+
+      - name: get kernel source
+        run: |
+          free -h
+          df -h
+          mount
+          cat /proc/cpuinfo
+
+          nix build --extra-experimental-features 'nix-command flakes' .#installer-bootstrap.config.system.build.kernel -j0 -L || true
+
+          nix build --extra-experimental-features 'nix-command flakes' .#installer-bootstrap.config.system.build.kernel.src -j1 -L -o kernel-src
+
+          nix build --extra-experimental-features 'nix-command flakes' .#installer-bootstrap.config.system.build.kernel.configfile -j1 -L
+
+          free -h
+          df -h
+
+      - name: build kernel
+        run: |
+          nix build --extra-experimental-features 'nix-command flakes' .#installer-bootstrap.config.system.build.kernel -j1 -L -o kernel
+
+          free -h
+          df -h
+
+      - name: clean up kernel source
+        run: |
+          KERNEL_SRC=$(readlink -f kernel-src)
+          rm kernel-src
+          nix-store --delete $KERNEL_SRC
+
+          free -h
+          df -h
+
 
       - name: build installer
         run: |
